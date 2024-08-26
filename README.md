@@ -51,14 +51,14 @@ visualize_subsurface_data.py: The main script that runs the visualization tool.
 README.md: Documentation for the project.
 requirements.txt: List of required Python packages.
 
-# Example Data
-# The tool expects CSV files with the following structure:
+## Example Data
+## The tool expects CSV files with the following structure:
 
-# x,y,z,value
-# 0,0,0,1.5
-# 0,0,1,1.6
-# 0,0,2,1.7
-# ...
+### x,y,z,value
+### 0,0,0,1.5
+### 0,0,1,1.6
+### 0,0,2,1.7
+### ...
 
 
 ### Contact
