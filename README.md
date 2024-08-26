@@ -30,7 +30,7 @@ This tool is designed to load, process, and visualize 3D subsurface data from mu
 ### Install the Required Packages:
 pip install -r requirements.txt
 
-### Usage
+# Usage
 ## Run the Tool:
 
 Ensure you have the necessary CSV files for anisotropic and isotropic data in the specified format.
