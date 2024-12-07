@@ -180,25 +180,19 @@ class VisualizationTool(HasTraits):
         except Exception as e:
             print(f"Error in set_data: {str(e)}")
 
-    @on_trait_change('opacity, threshold_value, show_colorbar, view_mode')
-    def _update_on_trait_change(self):
-        """Handle updates when traits change."""
-        if hasattr(self, 'update_visualization'):
-            self.update_visualization()
-
     def setup_scene(self):
-        """Set up common scene elements with proper error handling."""
+        """Set up common scene elements with improved colorbar handling."""
         try:
-            # Set white background - moved earlier in the setup
+            # Set white background
             if hasattr(self.scene, 'background'):
                 self.scene.background = (1.0, 1.0, 1.0)
 
-            # Clear any existing colorbar first
+            # Clear any existing colorbar
             if hasattr(self, 'colorbar') and self.colorbar is not None:
                 self.colorbar.remove()
                 self.colorbar = None
 
-            # Setup axes with error handling
+            # Setup axes
             try:
                 axes = mlab.axes(self.plot_data, color=(0, 0, 0),
                                  xlabel='X', ylabel='Y', zlabel='Z',
@@ -212,26 +206,28 @@ class VisualizationTool(HasTraits):
             except Exception as e:
                 print(f"Warning: Could not setup axes properly: {str(e)}")
 
-            # Add colorbar only if enabled
+            # Enhanced colorbar handling
             if self.show_colorbar and self.plot_data is not None:
                 try:
-                    # For Structure Identification mode, use the surface for colorbar
+                    # Choose appropriate source for colorbar
                     if self.view_mode == "Structure Identification" and hasattr(self, 'volume') and self.volume is not None:
-                        self.colorbar = mlab.colorbar(self.volume,
-                                                      orientation='vertical',
-                                                      title='Value',
-                                                      nb_labels=5)
-                    # For other modes, use the scalar field
+                        colorbar_source = self.volume
+                    elif hasattr(self, 'volume') and self.volume is not None:
+                        colorbar_source = self.volume
                     else:
-                        self.colorbar = mlab.colorbar(self.plot_data,
-                                                      orientation='vertical',
-                                                      title='Value',
-                                                      nb_labels=5)
+                        colorbar_source = self.plot_data
 
-                    # Ensure colorbar text is black for visibility on white background
+                    self.colorbar = mlab.colorbar(colorbar_source,
+                                                  orientation='vertical',
+                                                  title='Value',
+                                                  nb_labels=5)
+
+                    # Ensure colorbar text is visible
                     if self.colorbar is not None:
                         self.colorbar.label_text_property.color = (0, 0, 0)
                         self.colorbar.title_text_property.color = (0, 0, 0)
+                        self.colorbar.label_text_property.font_size = 10
+                        self.colorbar.title_text_property.font_size = 12
 
                 except Exception as e:
                     print(f"Warning: Could not create colorbar: {str(e)}")
@@ -269,22 +265,31 @@ class VisualizationTool(HasTraits):
             self.z_plane.ipw.opacity = self.opacity
 
     def add_multiple_slices(self):
-        """Add multiple slices if enabled."""
-        if self.enable_multi_slice:
-            for num_slices, axis, max_idx in [
-                (self.num_x_slices, 'x', self.x.shape[0]),
-                (self.num_y_slices, 'y', self.y.shape[1]),
-                (self.num_z_slices, 'z', self.z.shape[2])
-            ]:
-                if num_slices > 0:
-                    spacing = max_idx // (num_slices + 1)
-                    for i in range(1, num_slices + 1):
-                        slice_widget = mlab.pipeline.image_plane_widget(
-                            self.plot_data,
-                            plane_orientation=f'{axis}_axes',
-                            slice_index=i * spacing
-                        )
-                        slice_widget.ipw.opacity = self.opacity
+        """Enhanced multiple slice handling with proper updating."""
+        try:
+            # Clear existing slices first
+            # Clear only the slices, not the whole scene
+            self.scene.mlab.clf(figure=False)
+
+            if self.enable_multi_slice:
+                for num_slices, axis, max_idx in [
+                    (self.num_x_slices, 'x', self.x.shape[0]),
+                    (self.num_y_slices, 'y', self.y.shape[1]),
+                    (self.num_z_slices, 'z', self.z.shape[2])
+                ]:
+                    if num_slices > 0:
+                        spacing = max_idx // (num_slices + 1)
+                        for i in range(1, num_slices + 1):
+                            slice_widget = mlab.pipeline.image_plane_widget(
+                                self.plot_data,
+                                plane_orientation=f'{axis}_axes',
+                                slice_index=i * spacing
+                            )
+                            slice_widget.ipw.opacity = self.opacity
+                            # Store slice widget for later reference
+                            setattr(self, f'{axis}_slice_{i}', slice_widget)
+        except Exception as e:
+            print(f"Warning: Could not add multiple slices: {str(e)}")
 
     def _update_volume_opacity(self):
         """Update volume opacity using VTK's transfer functions."""
@@ -321,23 +326,18 @@ class VisualizationTool(HasTraits):
                     pass
 
     def update_visualization(self):
-        """Update the visualization with improved error handling."""
+        """Update visualization with improved error handling."""
         if not hasattr(self, 'scene') or self.scene is None:
             print("Warning: Scene not initialized")
             return
 
         try:
-            # Clear the scene
             self.scene.mlab.clf()
-
-            # Set white background immediately after clearing
             self.scene.background = (1.0, 1.0, 1.0)
 
-            # Ensure data is in the correct format
+            # Ensure data is in correct format
             if not isinstance(self.data, np.ndarray):
                 self.data = np.array(self.data, dtype=np.float64)
-
-            # Handle any infinite values
             self.data = np.nan_to_num(
                 self.data, nan=0.0, posinf=0.0, neginf=0.0)
 
@@ -352,9 +352,9 @@ class VisualizationTool(HasTraits):
             elif self.view_mode == "Interactive Slicing":
                 self.volume = mlab.pipeline.volume(self.plot_data)
                 self._update_volume_opacity()
-                self.add_cross_sections()
                 if self.enable_multi_slice:
                     self.add_multiple_slices()
+                self.add_cross_sections()
 
             elif self.view_mode == "Structure Identification":
                 threshold = mlab.pipeline.threshold(
@@ -378,6 +378,12 @@ class VisualizationTool(HasTraits):
         except Exception as e:
             print(f"Error in visualization update: {str(e)}")
 
+    @on_trait_change('opacity, threshold_value, show_colorbar, view_mode')
+    def _update_on_trait_change(self):
+        """Handle updates when traits change."""
+        if hasattr(self, 'update_visualization'):
+            self.update_visualization()
+
     @on_trait_change('view_data')
     def update_data(self):
         """Update the displayed data based on the selected data type."""
@@ -397,11 +403,22 @@ class VisualizationTool(HasTraits):
             elif hasattr(self.volume, 'actor'):
                 self.volume.actor.property.opacity = self.opacity
 
-    @on_trait_change('show_colorbar')
-    def _update_colorbar(self):
-        """Handle colorbar visibility changes."""
+    @on_trait_change('num_x_slices, num_y_slices, num_z_slices, enable_multi_slice')
+    def _update_slices(self):
+        """Handle updates to slice controls."""
         if hasattr(self, 'update_visualization'):
             self.update_visualization()
+
+    @on_trait_change('show_colorbar')
+    def _update_colorbar(self):
+        """Enhanced colorbar toggle handler."""
+        try:
+            if not self.show_colorbar and hasattr(self, 'colorbar') and self.colorbar is not None:
+                self.colorbar.remove()
+                self.colorbar = None
+            self.update_visualization()
+        except Exception as e:
+            print(f"Warning: Could not update colorbar: {str(e)}")
 
     # Define the view trait
     view = View(
