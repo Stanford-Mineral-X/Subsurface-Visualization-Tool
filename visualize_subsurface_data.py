@@ -27,6 +27,7 @@ Note: For Windows users, it's recommended to install VTK and Mayavi using conda:
 conda install -c conda-forge vtk mayavi
 
 Last Updated: 12/06/2024
+
 """
 
 from numpy import nan
